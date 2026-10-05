@@ -125,7 +125,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
       <div class="sm" id="hudTri">–</div>
     </div>
     <div id="pops"></div>
-    <div class="hint" id="hint">WASD · 방향키 이동 — 바위는 막히고 물에서는 느려집니다 — R 다시 시작</div>
+    <div class="hint" id="hint">WASD · 방향키 이동 — 바위는 막히고 물에서는 느려집니다 — R 다시 시작 — M 소리</div>
     <div class="msg" id="msg" hidden><b id="msgTitle">완주!</b><span class="new" id="msgNew" hidden>신기록</span>
       <div class="res"><span>시간</span><b id="rTime">–</b><span>수정 점수</span><b id="rPick">–</b><span>시간 보너스</span><b id="rBonus">–</b><span>최종 점수</span><b id="rPts">–</b></div>
       <span id="msgSub"></span></div>
@@ -162,6 +162,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
       <label><input type="checkbox" id="tInst" checked> GPU 인스턴싱 (끄면 바위·풀마다 드로우콜)</label>
       <label><input type="checkbox" id="tClouds" checked> 구름 (레이마칭 하늘)</label>
       <label><input type="checkbox" id="tGrass" checked> 풀 밟힘 반응</label>
+      <label><input type="checkbox" id="tSound" checked> 효과음 (Web Audio 합성, M)</label>
       <button class="pill store" id="btnRestart" style="cursor:pointer;border:0;font:inherit;font-size:12px">다시 시작 (R)</button>
     </div>
   </div>
@@ -191,6 +192,11 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
       <h3>플레이어 <span class="b" id="bPlayer">–</span></h3>
       <div class="pills"><span class="pill store">구 메쉬 1,280 삼각형</span><span class="arr">+</span><span class="pill calc">셰이더 무늬 · 구르기 회전</span></div>
       <p>무늬는 텍스처가 아니라 <strong>로컬 좌표의 사인 곱</strong>으로 계산합니다. 굴러가는 회전은 속도와 반지름에서 매 프레임 행렬로 누적합니다.</p>
+    </div>
+    <div class="row">
+      <h3>효과음 <span class="b" id="bSound">0 B</span></h3>
+      <div class="pills"><span class="pill calc">오실레이터 · 노이즈 합성 (4k 인트로 신스 기법)</span></div>
+      <p>오디오 파일이 없습니다. 수정 소리는 사인파 두 개를 콤보 단계에 맞춰 <strong>음 높이를 올려 가며</strong> 합성하고, 구르는 소리는 핑크 노이즈를 밴드패스 필터에 통과시켜 속도로 볼륨과 주파수를 움직입니다. 바위 충돌은 저음 사인 슬라이드, 물 입수는 필터 노이즈, 완주는 아르페지오입니다.</p>
     </div>
     <div class="row">
       <h3>하늘·구름·물 <span class="b" id="bSky">0 B</span></h3>
@@ -517,13 +523,66 @@ function renderBoard() {
 function popup(text, sub) { const el = document.createElement('div'); el.className = 'pop'; el.textContent = text; if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); }
   $('#pops').appendChild(el); el.addEventListener('animationend', () => el.remove()); }
 const opt = { inst: true, clouds: true, bend: true };
+
+/* ---------- 효과음: Web Audio 합성, 디스크 0 B ---------- */
+const SND_KEY = 'duneRun.sound';
+const snd = { on: true, ctx: null, master: null, rollGain: null, rollFilter: null, wasWater: false, lastThud: -1 };
+try { snd.on = localStorage.getItem(SND_KEY) !== 'off'; } catch {}
+function audioInit() {                       // 첫 사용자 입력에서 호출 (자동재생 정책)
+  if (snd.ctx) { if (snd.ctx.state === 'suspended') snd.ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  const ctx = snd.ctx = new AC();
+  const master = snd.master = ctx.createGain(); master.gain.value = snd.on ? 0.5 : 0; master.connect(ctx.destination);
+  // 구르기: 핑크 노이즈 근사 → 밴드패스 → 게인. 매 프레임 속도로 게인·주파수를 움직인다
+  const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0;
+  for (let i = 0; i < len; i++) { const w = Math.random()*2-1; b0 = 0.99765*b0 + w*0.099; b1 = 0.963*b1 + w*0.2965; b2 = 0.57*b2 + w*1.0526; d[i] = (b0+b1+b2+w*0.1848)*0.11; }
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const filt = snd.rollFilter = ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 300; filt.Q.value = 0.8;
+  const g = snd.rollGain = ctx.createGain(); g.gain.value = 0;
+  src.connect(filt).connect(g).connect(master); src.start();
+}
+function setSound(on) { snd.on = on; $('#tSound').checked = on; try { localStorage.setItem(SND_KEY, on ? 'on' : 'off'); } catch {}
+  if (snd.master) snd.master.gain.setTargetAtTime(on ? 0.5 : 0, snd.ctx.currentTime, 0.02); }
+function tone(freq, t0, dur, o = {}) {        // 오실레이터 하나 + 엔벨로프
+  const ctx = snd.ctx; if (!ctx || ctx.state !== 'running') return;   // 정지 중 예약된 소리가 재개 때 몰리지 않게
+  const osc = ctx.createOscillator(), g = ctx.createGain(); osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(freq, t0);
+  if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t0 + dur);
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(o.vol ?? 0.3, t0 + (o.attack ?? 0.005)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g).connect(snd.master); osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+function burst(t0, dur, o = {}) {             // 짧은 노이즈 + 필터 + 엔벨로프
+  const ctx = snd.ctx; if (!ctx || ctx.state !== 'running') return;
+  const n = Math.ceil(ctx.sampleRate * dur), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random()*2-1;
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const f = ctx.createBiquadFilter(); f.type = o.type || 'lowpass'; f.frequency.setValueAtTime(o.freq || 400, t0); if (o.slide) f.frequency.exponentialRampToValueAtTime(o.slide, t0 + dur); f.Q.value = o.q ?? 1;
+  const g = ctx.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(o.vol ?? 0.3, t0 + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(snd.master); src.start(t0); src.stop(t0 + dur + 0.02);
+}
+const now = () => snd.ctx ? snd.ctx.currentTime : 0;
+const PENTA = [659.25, 783.99, 880, 1046.5, 1174.66];   // E5 G5 A5 C6 D6: 콤보 단계마다 한 음씩 위로
+const sfx = {
+  pickup(combo) { if (!snd.ctx) return; const t = now(), f = PENTA[Math.min(PENTA.length, combo) - 1];
+    tone(f, t, 0.35, { vol: 0.22 }); tone(f*2, t, 0.25, { type: 'triangle', vol: 0.08 }); tone(f*3, t + 0.05, 0.18, { vol: 0.05 }); },
+  thud(k) { if (!snd.ctx) return; const t = now(); tone(110, t, 0.18, { slide: 45, vol: 0.35*k, attack: 0.002 }); burst(t, 0.12, { freq: 260, slide: 80, vol: 0.25*k }); },
+  splash() { if (!snd.ctx) return; const t = now(); burst(t, 0.35, { type: 'bandpass', freq: 1400, slide: 300, q: 0.6, vol: 0.28 }); tone(320, t, 0.25, { slide: 140, vol: 0.12, type: 'triangle' }); },
+  finish(newRec) { if (!snd.ctx) return; const t = now(); [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => { tone(f, t + i*0.11, 0.5, { vol: 0.2 }); tone(f*2, t + i*0.11, 0.3, { type: 'triangle', vol: 0.06 }); });
+    if (newRec) [1318.5, 1568, 2093].forEach((f, i) => tone(f, t + 0.5 + i*0.09, 0.6, { vol: 0.14 })); },
+  restart() { if (!snd.ctx) return; const t = now(); tone(440, t, 0.1, { slide: 880, vol: 0.12, type: 'square' }); },
+  roll(speed, inWater) { if (!snd.rollGain) return; const t = now(), k = Math.min(1, speed/7.5);
+    snd.rollGain.gain.setTargetAtTime(k * (inWater ? 0.18 : 0.32), t, 0.06);
+    snd.rollFilter.frequency.setTargetAtTime(inWater ? 140 + k*120 : 220 + k*420, t, 0.08); },
+};
 const keys = {}; let stick = null;
 let T = 0, gpuMs = null, cpuMs = null;
 
 function restart() {
+  const wasPlaying = game.started || game.done;
   P.x = 0; P.z = 0; P.vx = 0; P.vz = 0; P.rot.set([1,0,0, 0,1,0, 0,0,1]); P.heading = 0;
   game.score = 0; game.pts = 0; game.time = 0; game.done = false; game.started = false; game.combo = 0; game.maxCombo = 0; game.lastPick = -1; game.bonus = 0; cam.yaw = Math.PI*0.5;
   $('#pops').innerHTML = ''; $('#hudPts').textContent = '0'; $('#hudCombo').hidden = true; $('#msgNew').hidden = true;
+  snd.wasWater = false; if (wasPlaying) sfx.restart();
   crystals.list.forEach((c,i) => { c.on = true; crystals.inst[i*4+3] = 1; });
   gl.bindBuffer(gl.ARRAY_BUFFER, crystals.ibuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, crystals.inst);
   $('#msg').hidden = true; $('#hudScore').textContent = `수정 0 / ${crystals.list.length}`;
@@ -551,10 +610,13 @@ function update(dt) {
   const h = groundH(P.x, P.z), inWater = h < WATER - 0.05, speed = inWater ? 3.2 : 7.5, accel = inWater ? 10 : 26;
   P.vx += (ix*speed - P.vx) * Math.min(1, accel*dt/speed*1.2); P.vz += (iz*speed - P.vz) * Math.min(1, accel*dt/speed*1.2);
   if (il < 0.05) { P.vx *= Math.pow(0.02, dt); P.vz *= Math.pow(0.02, dt); }
+  const spd = Math.hypot(P.vx, P.vz); sfx.roll(spd, inWater);
+  if (inWater && !snd.wasWater && spd > 1.5) sfx.splash(); snd.wasWater = inWater;
   let nx = P.x + P.vx*dt, nz = P.z + P.vz*dt;
   // 바위 충돌: 저장된 배치 배열을 읽는다
   for (const r of rockList) { const dx = nx-r.x, dz = nz-r.z, d = Math.hypot(dx,dz), min = r.r + 0.5;
-    if (d < min && d > 1e-4) { nx = r.x + dx/d*min; nz = r.z + dz/d*min; const dot = (P.vx*dx + P.vz*dz)/d; if (dot < 0) { P.vx -= dot*dx/d; P.vz -= dot*dz/d; } } }
+    if (d < min && d > 1e-4) { nx = r.x + dx/d*min; nz = r.z + dz/d*min; const dot = (P.vx*dx + P.vz*dz)/d; if (dot < 0) { P.vx -= dot*dx/d; P.vz -= dot*dz/d;
+        if (-dot > 2.5 && T - snd.lastThud > 0.15) { snd.lastThud = T; sfx.thud(Math.min(1, -dot/7.5)); } } } }
   nx = Math.max(-EXT+1.5, Math.min(EXT-1.5, nx)); nz = Math.max(-EXT+1.5, Math.min(EXT-1.5, nz));
   // 구르기: 이동량 / 반지름
   const mx = nx-P.x, mz = nz-P.z, ml = Math.hypot(mx,mz);
@@ -568,14 +630,14 @@ function update(dt) {
       game.combo = (game.lastPick >= 0 && game.time - game.lastPick <= COMBO_WINDOW) ? Math.min(COMBO_MAX, game.combo + 1) : 1;
       game.maxCombo = Math.max(game.maxCombo, game.combo); game.lastPick = game.time;
       const gain = BASE_PTS * game.combo; game.pts += gain;
-      popup(`+${gain}`, game.combo > 1 ? `콤보 ×${game.combo}` : null);
+      popup(`+${gain}`, game.combo > 1 ? `콤보 ×${game.combo}` : null); sfx.pickup(game.combo);
       $('#hudScore').textContent = `수정 ${game.score} / ${crystals.list.length}`; $('#hudPts').textContent = fmt(game.pts);
       if (game.score === crystals.list.length) { game.done = true;
         game.bonus = Math.max(0, Math.round(600 - game.time*5)); const pick = game.pts; game.pts += game.bonus;
         const rank = addRecord({ pts: game.pts, time: +game.time.toFixed(2), maxCombo: game.maxCombo, at: Date.now() }); renderBoard();
         $('#hudPts').textContent = fmt(game.pts); $('#hudCombo').hidden = true;
         $('#rTime').textContent = fmtT(game.time); $('#rPick').textContent = fmt(pick); $('#rBonus').textContent = '+' + fmt(game.bonus); $('#rPts').textContent = fmt(game.pts);
-        $('#msgNew').hidden = rank !== 0; $('#msgSub').textContent = (rank >= 0 ? `점수판 ${rank+1}위 · ` : '') + 'R 키로 다시 시작';
+        $('#msgNew').hidden = rank !== 0; sfx.finish(rank === 0); $('#msgSub').textContent = (rank >= 0 ? `점수판 ${rank+1}위 · ` : '') + 'R 키로 다시 시작';
         $('#msg').hidden = false; } } }
   // 카메라: 이동 방향 뒤로 천천히 따라감, 지형 아래로는 안 내려감
   if (ml > 1e-4) { let want = P.heading + Math.PI, diff = Math.atan2(Math.sin(want-cam.yaw), Math.cos(want-cam.yaw)); cam.yaw += diff * Math.min(1, dt*1.6); }
@@ -659,13 +721,14 @@ const sceneTris = terrain.tris + rockCount*320 + grass.n*5 + crystals.list.lengt
 $('#gpuNote').textContent = timer ? 'GPU 타이머 사용 가능: GPU 시간은 실제 측정값입니다.' : 'GPU 타이머 미지원 브라우저: GPU 시간은 표시되지 않습니다.';
 
 /* ---------- 입력 ---------- */
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (e.target.tagName === 'INPUT') return;
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (e.target.tagName === 'INPUT') return; audioInit();
+  if (k === 'm' && !e.repeat) { setSound(!snd.on); return; }
   if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
   keys[k] = true; if (k === 'r') restart(); });
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 const stickEl = $('#stick'); let stickOrigin = null;
-canvas.addEventListener('pointerdown', e => { canvas.focus(); stickOrigin = { x: e.clientX, y: e.clientY }; stick = { dx: 0, dy: 0 }; canvas.setPointerCapture(e.pointerId);
+canvas.addEventListener('pointerdown', e => { canvas.focus(); audioInit(); stickOrigin = { x: e.clientX, y: e.clientY }; stick = { dx: 0, dy: 0 }; canvas.setPointerCapture(e.pointerId);
   const r = $('#game').getBoundingClientRect(); stickEl.style.left = (e.clientX-r.left)+'px'; stickEl.style.top = (e.clientY-r.top)+'px'; stickEl.style.display = 'block'; });
 canvas.addEventListener('pointermove', e => { if (!stickOrigin) return; const dx = (e.clientX-stickOrigin.x)/60, dy = (e.clientY-stickOrigin.y)/60, l = Math.hypot(dx,dy), s = l > 1 ? 1/l : 1; stick = { dx: dx*s, dy: dy*s }; });
 const stickEnd = () => { stickOrigin = null; stick = null; stickEl.style.display = 'none'; };
@@ -673,7 +736,8 @@ canvas.addEventListener('pointerup', stickEnd); canvas.addEventListener('pointer
 $('#tInst').addEventListener('change', e => opt.inst = e.target.checked);
 $('#tClouds').addEventListener('change', e => opt.clouds = e.target.checked);
 $('#tGrass').addEventListener('change', e => opt.bend = e.target.checked);
-$('#btnRestart').addEventListener('click', restart);
+$('#tSound').checked = snd.on; $('#tSound').addEventListener('change', e => { audioInit(); setSound(e.target.checked); });
+$('#btnRestart').addEventListener('click', () => { audioInit(); restart(); });
 $('#btnClear').addEventListener('click', () => { records = []; lastRec = null; saveRecords(records); renderBoard(); });
 renderBoard();
 
