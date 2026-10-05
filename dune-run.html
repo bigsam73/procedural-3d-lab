@@ -1,3 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>듄 런</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -38,6 +41,21 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
 .hud .msg b{font-family:var(--display);font-weight:400;font-size:clamp(26px,4vw,44px);line-height:1.1}
 .hud .msg span{font-size:13px}
 .hud .msg[hidden]{display:none}
+.hud .msg .res{display:grid;grid-template-columns:auto auto;gap:2px 14px;justify-content:center;font-size:13px;text-align:left;margin-top:4px}
+.hud .msg .res b{font-size:14px;font-family:var(--mono);font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+.hud .msg .new{color:#ffd166;font-size:13px;letter-spacing:.06em}
+.hud .msg .new[hidden]{display:none}
+.hud .lbl{font-size:10px;letter-spacing:.1em;opacity:.8;background:none;padding:0;margin-top:2px}
+.hud .timer{font-size:clamp(15px,2.2vw,22px);font-variant-numeric:tabular-nums;display:flex;gap:8px;align-items:baseline}
+.hud .timer em{font-style:normal;font-size:10px;letter-spacing:.08em;opacity:.8}
+.hud .timer.run{color:#fff}.hud .timer.done{color:#3ff0dc}
+.hud .combo{color:#ffd166;display:flex;gap:8px;align-items:center}
+.hud .combo i{display:block;width:60px;height:4px;background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden}
+.hud .combo i::after{content:"";display:block;height:100%;width:var(--w,100%);background:#ffd166}
+.hud .combo[hidden]{display:none}
+.hud .pop{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-family:var(--display);font-size:clamp(22px,3.5vw,36px);color:#3ff0dc;text-shadow:0 2px 6px rgba(0,0,0,.6);animation:pop .9s ease-out forwards;white-space:nowrap}
+.hud .pop small{font-size:.5em;color:#ffd166;margin-left:6px}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}60%{opacity:1}100%{opacity:0;transform:translate(-50%,-130%) scale(1)}}
 .minimap{position:absolute;right:12px;top:12px;width:132px;height:132px;border:1px solid rgba(255,255,255,.7);border-radius:6px;image-rendering:pixelated;background:#000}
 .minimap-label{position:absolute;right:12px;top:148px;font-family:var(--mono);font-size:10px;color:#f6f2ea;background:rgba(10,12,14,.5);padding:1px 6px;border-radius:3px}
 .stick{position:absolute;width:56px;height:56px;border-radius:50%;border:2px solid rgba(255,255,255,.8);background:rgba(255,255,255,.2);transform:translate(-50%,-50%);pointer-events:none;display:none}
@@ -60,6 +78,15 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
 .toggles label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .toggles input{accent-color:var(--calc)}
 
+.board table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.board th,.board td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.board th{font-weight:500;color:var(--muted);font-size:12px}
+.board td:first-child,.board th:first-child{text-align:left;width:2.5em}
+.board td:nth-child(2),.board th:nth-child(2){text-align:left}
+.board tr.me td{color:#ffd166}
+.board tr.empty td{color:var(--muted);text-align:center;padding:14px;white-space:normal}
+.board .note{margin:0;font-size:12.5px;color:var(--muted)}
+.board .btn{cursor:pointer;border:0;font:inherit;font-size:12px}
 .rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
 .row{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px;min-width:0}
 .row h3{margin:0;font-size:16px;font-weight:500;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -76,7 +103,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
 <div class="wrap">
 <header>
   <h1>듄 런</h1>
-  <p class="lede">앞의 두 페이지에서 본 패턴을 전부 넣은 작은 레벨입니다. 공을 굴려 수정 12개를 모으세요. <strong>WASD 또는 방향키</strong>로 움직이고, 폰에서는 화면을 끌면 조이스틱이 됩니다. 레벨 전체의 디스크 용량은 아래 명세표에 실시간으로 집계됩니다.</p>
+  <p class="lede">앞의 두 페이지에서 본 패턴을 전부 넣은 작은 레벨입니다. 공을 굴려 수정 12개를 모으세요. 빠르게 연속으로 모으면 콤보 점수가 붙고, 완주 시간이 짧을수록 보너스가 커집니다. <strong>WASD 또는 방향키</strong>로 움직이고, 폰에서는 화면을 끌면 조이스틱이 됩니다. 레벨 전체의 디스크 용량은 아래 명세표에 실시간으로 집계됩니다.</p>
   <div class="legend">
     <span class="pill calc">계산</span><span class="pill bake">베이크</span><span class="pill store">저장</span>
     <span id="gpuNote"></span>
@@ -90,16 +117,34 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);lin
   <div class="stick" id="stick"></div>
   <div class="hud">
     <div class="tl">
-      <div class="big" id="hudScore">수정 0 / 12</div>
-      <div class="sm" id="hudTime">0.0 s</div>
+      <div class="sm lbl">점수</div>
+      <div class="big" id="hudPts">0</div>
+      <div class="sm" id="hudScore">수정 0 / 12</div>
+      <div class="sm timer" id="hudTime"><span id="hudClock">00:00.0</span><em id="hudState">대기 · 움직이면 시작</em></div>
+      <div class="sm combo" id="hudCombo" hidden><span id="hudComboTxt">콤보 ×2</span><i id="hudComboBar"></i></div>
       <div class="sm" id="hudTri">–</div>
     </div>
+    <div id="pops"></div>
     <div class="hint" id="hint">WASD · 방향키 이동 — 바위는 막히고 물에서는 느려집니다 — R 다시 시작</div>
-    <div class="msg" id="msg" hidden><b id="msgTitle">완주!</b><span id="msgSub"></span></div>
+    <div class="msg" id="msg" hidden><b id="msgTitle">완주!</b><span class="new" id="msgNew" hidden>신기록</span>
+      <div class="res"><span>시간</span><b id="rTime">–</b><span>수정 점수</span><b id="rPick">–</b><span>시간 보너스</span><b id="rBonus">–</b><span>최종 점수</span><b id="rPts">–</b></div>
+      <span id="msgSub"></span></div>
   </div>
 </div>
 
 <section class="spec">
+  <div class="budget board">
+    <div class="top">
+      <h2>점수판</h2>
+      <div class="total" id="bestLine">–<small>최고 기록</small></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>날짜</th><th>시간</th><th>최대 콤보</th><th>점수</th></tr></thead>
+      <tbody id="boardBody"></tbody>
+    </table>
+    <p class="note">수정 하나에 100점. 직전 수집 후 4초 안에 다음 수정을 모으면 콤보가 올라가 ×2 … ×5까지 곱해집니다. 완주하면 시간 보너스 <span style="font-family:var(--mono)">max(0, 600 − 5 × 초)</span>가 더해집니다. 기록은 이 브라우저에만 저장됩니다.</p>
+    <div class="toggles"><button class="pill store btn" id="btnClear">기록 지우기</button></div>
+  </div>
   <div class="budget">
     <div class="top">
       <h2>이 레벨은 무엇으로 만들어졌나</h2>
@@ -451,14 +496,34 @@ function drawMini() {
 /* ---------- 게임 상태 ---------- */
 const P = { x: 0, z: 0, y: 0, vx: 0, vz: 0, rot: new Float32Array([1,0,0, 0,1,0, 0,0,1]), heading: 0 };
 const cam = { yaw: Math.PI*0.5, pitch: 0.42, dist: 7.5, pos: [0,5,-7], target: [0,0,0] };
-const game = { score: 0, time: 0, done: false, started: false };
+const game = { score: 0, pts: 0, time: 0, done: false, started: false, combo: 0, maxCombo: 0, lastPick: -1, bonus: 0 };
+const BASE_PTS = 100, COMBO_WINDOW = 4, COMBO_MAX = 5;
+const fmtT = t => { const m = Math.floor(t/60), sec = t - m*60; return `${String(m).padStart(2,'0')}:${sec.toFixed(1).padStart(4,'0')}`; };
+
+/* ---------- 점수판: localStorage 상위 5개 ---------- */
+const REC_KEY = 'duneRun.records.v1';
+function loadRecords() { try { const r = JSON.parse(localStorage.getItem(REC_KEY) || '[]'); return Array.isArray(r) ? r : []; } catch { return []; } }
+function saveRecords(r) { try { localStorage.setItem(REC_KEY, JSON.stringify(r)); } catch {} }
+let records = loadRecords(), lastRec = null;
+function addRecord(rec) { records.push(rec); records.sort((a,b) => b.pts - a.pts || a.time - b.time); records = records.slice(0, 5); saveRecords(records); lastRec = rec; return records.indexOf(rec); }
+function renderBoard() {
+  const tb = $('#boardBody'); tb.innerHTML = '';
+  if (!records.length) { tb.innerHTML = '<tr class="empty"><td colspan="5">아직 기록이 없습니다. 수정 12개를 모두 모으면 여기에 올라갑니다.</td></tr>'; }
+  records.forEach((r,i) => { const tr = document.createElement('tr'); if (r === lastRec) tr.className = 'me';
+    const d = new Date(r.at); const date = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    tr.innerHTML = `<td>${i+1}</td><td>${date}</td><td>${fmtT(r.time)}</td><td>×${r.maxCombo}</td><td>${fmt(r.pts)}</td>`; tb.appendChild(tr); });
+  $('#bestLine').firstChild.textContent = records.length ? `${fmt(records[0].pts)}점 · ${fmtT(records[0].time)}` : '–';
+}
+function popup(text, sub) { const el = document.createElement('div'); el.className = 'pop'; el.textContent = text; if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); }
+  $('#pops').appendChild(el); el.addEventListener('animationend', () => el.remove()); }
 const opt = { inst: true, clouds: true, bend: true };
 const keys = {}; let stick = null;
 let T = 0, gpuMs = null, cpuMs = null;
 
 function restart() {
   P.x = 0; P.z = 0; P.vx = 0; P.vz = 0; P.rot.set([1,0,0, 0,1,0, 0,0,1]); P.heading = 0;
-  game.score = 0; game.time = 0; game.done = false; game.started = false; cam.yaw = Math.PI*0.5;
+  game.score = 0; game.pts = 0; game.time = 0; game.done = false; game.started = false; game.combo = 0; game.maxCombo = 0; game.lastPick = -1; game.bonus = 0; cam.yaw = Math.PI*0.5;
+  $('#pops').innerHTML = ''; $('#hudPts').textContent = '0'; $('#hudCombo').hidden = true; $('#msgNew').hidden = true;
   crystals.list.forEach((c,i) => { c.on = true; crystals.inst[i*4+3] = 1; });
   gl.bindBuffer(gl.ARRAY_BUFFER, crystals.ibuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, crystals.inst);
   $('#msg').hidden = true; $('#hudScore').textContent = `수정 0 / ${crystals.list.length}`;
@@ -499,8 +564,19 @@ function update(dt) {
   if (!game.done) for (let i=0;i<crystals.list.length;i++) { const c = crystals.list[i]; if (!c.on) continue;
     if (Math.hypot(P.x-c.x, P.z-c.z) < 1.0 && Math.abs(P.y-c.y) < 2.0) { c.on = false; crystals.inst[i*4+3] = 0; game.score++;
       gl.bindBuffer(gl.ARRAY_BUFFER, crystals.ibuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, crystals.inst);
-      $('#hudScore').textContent = `수정 ${game.score} / ${crystals.list.length}`;
-      if (game.score === crystals.list.length) { game.done = true; $('#msg').hidden = false; $('#msgSub').textContent = `${game.time.toFixed(1)}초 · R 키로 다시 시작`; } } }
+      // 점수: 기본 100점, 4초 안에 연속 수집하면 콤보 배수
+      game.combo = (game.lastPick >= 0 && game.time - game.lastPick <= COMBO_WINDOW) ? Math.min(COMBO_MAX, game.combo + 1) : 1;
+      game.maxCombo = Math.max(game.maxCombo, game.combo); game.lastPick = game.time;
+      const gain = BASE_PTS * game.combo; game.pts += gain;
+      popup(`+${gain}`, game.combo > 1 ? `콤보 ×${game.combo}` : null);
+      $('#hudScore').textContent = `수정 ${game.score} / ${crystals.list.length}`; $('#hudPts').textContent = fmt(game.pts);
+      if (game.score === crystals.list.length) { game.done = true;
+        game.bonus = Math.max(0, Math.round(600 - game.time*5)); const pick = game.pts; game.pts += game.bonus;
+        const rank = addRecord({ pts: game.pts, time: +game.time.toFixed(2), maxCombo: game.maxCombo, at: Date.now() }); renderBoard();
+        $('#hudPts').textContent = fmt(game.pts); $('#hudCombo').hidden = true;
+        $('#rTime').textContent = fmtT(game.time); $('#rPick').textContent = fmt(pick); $('#rBonus').textContent = '+' + fmt(game.bonus); $('#rPts').textContent = fmt(game.pts);
+        $('#msgNew').hidden = rank !== 0; $('#msgSub').textContent = (rank >= 0 ? `점수판 ${rank+1}위 · ` : '') + 'R 키로 다시 시작';
+        $('#msg').hidden = false; } } }
   // 카메라: 이동 방향 뒤로 천천히 따라감, 지형 아래로는 안 내려감
   if (ml > 1e-4) { let want = P.heading + Math.PI, diff = Math.atan2(Math.sin(want-cam.yaw), Math.cos(want-cam.yaw)); cam.yaw += diff * Math.min(1, dt*1.6); }
   cam.target = [P.x, P.y + 0.6, P.z];
@@ -598,6 +674,8 @@ $('#tInst').addEventListener('change', e => opt.inst = e.target.checked);
 $('#tClouds').addEventListener('change', e => opt.clouds = e.target.checked);
 $('#tGrass').addEventListener('change', e => opt.bend = e.target.checked);
 $('#btnRestart').addEventListener('click', restart);
+$('#btnClear').addEventListener('click', () => { records = []; lastRec = null; saveRecords(records); renderBoard(); });
+renderBoard();
 
 /* ---------- 루프 ---------- */
 restart();
@@ -605,8 +683,17 @@ let last = performance.now(), hudTick = 0;
 (function frame(now) {
   const dt = Math.min(0.05, (now-last)/1000); last = now; T += dt;
   update(dt); render(); drawMini();
+  if ((hudTick & 1) === 0) {   // 타이머와 콤보는 자주 갱신
+    $('#hudClock').textContent = fmtT(game.time);
+    const st = $('#hudState'), tm = $('#hudTime');
+    if (game.done) { st.textContent = '완료'; tm.className = 'sm timer done'; }
+    else if (game.started) { st.textContent = '진행 중'; tm.className = 'sm timer run'; }
+    else { st.textContent = '대기 · 움직이면 시작'; tm.className = 'sm timer'; }
+    const left = game.lastPick >= 0 ? COMBO_WINDOW - (game.time - game.lastPick) : -1, combo = $('#hudCombo');
+    if (!game.done && left > 0 && game.combo >= 1) { combo.hidden = false; $('#hudComboTxt').textContent = `콤보 ×${Math.min(COMBO_MAX, game.combo+1)} 준비 · ${left.toFixed(1)}s`; $('#hudComboBar').style.setProperty('--w', (left/COMBO_WINDOW*100).toFixed(0) + '%'); }
+    else combo.hidden = true;
+  }
   if ((hudTick++ & 7) === 0) {
-    $('#hudTime').textContent = game.time.toFixed(1) + ' s';
     $('#hudTri').textContent = `삼각형 ${fmt(sceneTris)} · 드로우콜 ${fmt(drawCalls)}` + (gpuMs != null ? ` · GPU ${gpuMs.toFixed(1)} ms` : '');
     $('#stTri').textContent = fmt(sceneTris); $('#stDraw').textContent = fmt(drawCalls);
     $('#stGpu').textContent = gpuMs != null ? gpuMs.toFixed(2) + ' ms' : '측정 불가'; $('#stCpu').textContent = (cpuMs||0).toFixed(2) + ' ms';
