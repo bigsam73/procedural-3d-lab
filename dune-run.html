@@ -1,0 +1,617 @@
+<title>듄 런</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 게임 화면 하나가 위에 꽉 차고, 아래에 "이 레벨은 무엇으로 만들어졌나" 명세표. 역할 색은 앞 페이지와 동일. */
+:root{
+  --bg:#f3efe6; --panel:#fbf9f4; --fg:#1f2426; --muted:#5e6670; --line:#d9d2c3;
+  --calc:#0f7f82; --calc-soft:#d7eeee; --store:#b86a0a; --store-soft:#f6e6cc; --bake:#6b5ca5; --bake-soft:#e6e0f4;
+  --code-bg:#ebe6da; --ok:#2b7a3e;
+  --display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
+  --body:"IBM Plex Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#15191d; --panel:#1d2227; --fg:#e8e4da; --muted:#9aa3ab; --line:#333b43;
+  --calc:#3fd1c6; --calc-soft:#163538; --store:#f0b454; --store-soft:#3a2c14; --bake:#b9a8f0; --bake-soft:#2a2440;
+  --code-bg:#11151a; --ok:#6fcf8a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#15191d; --panel:#1d2227; --fg:#e8e4da; --muted:#9aa3ab; --line:#333b43;
+  --calc:#3fd1c6; --calc-soft:#163538; --store:#f0b454; --store-soft:#3a2c14; --bake:#b9a8f0; --bake-soft:#2a2440;
+  --code-bg:#11151a; --ok:#6fcf8a; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.6;margin:0;padding-block:24px 56px;padding-inline:16px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:22px}
+header{display:grid;gap:8px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,56px);line-height:1.05;margin:0}
+.lede{max-width:70ch;margin:0;color:var(--muted)}
+.lede strong{color:var(--fg);font-weight:500}
+
+.game{position:relative;max-width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#7f9fc4;border:1px solid var(--line)}
+.game canvas.gl{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair;outline:none}
+.hud{position:absolute;inset:0;pointer-events:none;font-family:var(--mono);color:#f6f2ea}
+.hud .tl{position:absolute;left:14px;top:12px;display:grid;gap:4px}
+.hud .big{font-family:var(--display);font-size:clamp(22px,3.5vw,38px);line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.hud .sm{font-size:12px;background:rgba(10,12,14,.5);padding:2px 8px;border-radius:4px;width:max-content}
+.hud .hint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);font-size:12px;background:rgba(10,12,14,.55);padding:4px 12px;border-radius:999px;white-space:nowrap;max-width:calc(100% - 28px);overflow:hidden;text-overflow:ellipsis}
+.hud .msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;background:rgba(10,12,14,.7);padding:18px 28px;border-radius:10px;display:grid;gap:6px}
+.hud .msg b{font-family:var(--display);font-weight:400;font-size:clamp(26px,4vw,44px);line-height:1.1}
+.hud .msg span{font-size:13px}
+.hud .msg[hidden]{display:none}
+.minimap{position:absolute;right:12px;top:12px;width:132px;height:132px;border:1px solid rgba(255,255,255,.7);border-radius:6px;image-rendering:pixelated;background:#000}
+.minimap-label{position:absolute;right:12px;top:148px;font-family:var(--mono);font-size:10px;color:#f6f2ea;background:rgba(10,12,14,.5);padding:1px 6px;border-radius:3px}
+.stick{position:absolute;width:56px;height:56px;border-radius:50%;border:2px solid rgba(255,255,255,.8);background:rgba(255,255,255,.2);transform:translate(-50%,-50%);pointer-events:none;display:none}
+
+.spec{display:grid;gap:14px}
+.spec h2{font-family:var(--display);font-weight:400;font-size:30px;line-height:1.1;margin:0}
+.budget{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px}
+.budget .top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;align-items:baseline}
+.budget .total{font-family:var(--mono);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.budget .total small{font-size:13px;color:var(--muted);font-weight:400;margin-left:8px}
+.bar{display:flex;height:18px;border-radius:5px;overflow:hidden;background:var(--code-bg)}
+.bar span{display:block;height:100%;min-width:2px}
+.bar-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.bar-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.live{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.stat{background:var(--code-bg);border-radius:6px;padding:8px 10px;min-width:0}
+.stat b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.toggles{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px}
+.toggles label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.toggles input{accent-color:var(--calc)}
+
+.rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px;min-width:0}
+.row h3{margin:0;font-size:16px;font-weight:500;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.row h3 .b{font-family:var(--mono);font-size:13px;color:var(--muted);font-weight:400;white-space:nowrap}
+.pills{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;font-family:var(--mono);font-size:11.5px;padding:1px 9px;border-radius:999px;white-space:nowrap}
+.pill.calc{background:var(--calc-soft);color:var(--calc)} .pill.store{background:var(--store-soft);color:var(--store)} .pill.bake{background:var(--bake-soft);color:var(--bake)}
+.pills .arr{opacity:.6}
+.row p{margin:0;font-size:13px;color:var(--muted)}
+.row p strong{color:var(--fg);font-weight:500}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;color:var(--muted);align-items:center}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>듄 런</h1>
+  <p class="lede">앞의 두 페이지에서 본 패턴을 전부 넣은 작은 레벨입니다. 공을 굴려 수정 12개를 모으세요. <strong>WASD 또는 방향키</strong>로 움직이고, 폰에서는 화면을 끌면 조이스틱이 됩니다. 레벨 전체의 디스크 용량은 아래 명세표에 실시간으로 집계됩니다.</p>
+  <div class="legend">
+    <span class="pill calc">계산</span><span class="pill bake">베이크</span><span class="pill store">저장</span>
+    <span id="gpuNote"></span>
+  </div>
+</header>
+
+<div class="game" id="game">
+  <canvas class="gl" id="gl" tabindex="0"></canvas>
+  <canvas class="minimap" id="mini" width="161" height="161"></canvas>
+  <span class="minimap-label">terrain.r16 (미니맵도 같은 파일)</span>
+  <div class="stick" id="stick"></div>
+  <div class="hud">
+    <div class="tl">
+      <div class="big" id="hudScore">수정 0 / 12</div>
+      <div class="sm" id="hudTime">0.0 s</div>
+      <div class="sm" id="hudTri">–</div>
+    </div>
+    <div class="hint" id="hint">WASD · 방향키 이동 — 바위는 막히고 물에서는 느려집니다 — R 다시 시작</div>
+    <div class="msg" id="msg" hidden><b id="msgTitle">완주!</b><span id="msgSub"></span></div>
+  </div>
+</div>
+
+<section class="spec">
+  <div class="budget">
+    <div class="top">
+      <h2>이 레벨은 무엇으로 만들어졌나</h2>
+      <div class="total" id="total">–<small>디스크 총합</small></div>
+    </div>
+    <div class="bar" id="bar"></div>
+    <div class="bar-legend" id="barLegend"></div>
+    <div class="live">
+      <div class="stat"><b id="stTri">–</b><span>화면의 삼각형</span></div>
+      <div class="stat"><b id="stDraw">–</b><span>드로우콜</span></div>
+      <div class="stat"><b id="stGpu">–</b><span>GPU 시간 / 프레임</span></div>
+      <div class="stat"><b id="stCpu">–</b><span>게임 로직 CPU / 프레임 (충돌 포함)</span></div>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="tInst" checked> GPU 인스턴싱 (끄면 바위·풀마다 드로우콜)</label>
+      <label><input type="checkbox" id="tClouds" checked> 구름 (레이마칭 하늘)</label>
+      <label><input type="checkbox" id="tGrass" checked> 풀 밟힘 반응</label>
+      <button class="pill store" id="btnRestart" style="cursor:pointer;border:0;font:inherit;font-size:12px">다시 시작 (R)</button>
+    </div>
+  </div>
+
+  <div class="rows">
+    <div class="row">
+      <h3>지형 <span class="b" id="bTerrain">–</span></h3>
+      <div class="pills"><span class="pill calc">노이즈 생성기</span><span class="arr">→</span><span class="pill bake">빌드 시 베이크</span><span class="arr">→</span><span class="pill store">terrain.r16 161×161</span></div>
+      <p><strong>같은 파일을 세 곳이 읽습니다.</strong> 렌더링 메쉬, 플레이어 충돌(바닥 높이), 미니맵. 런타임에 노이즈를 다시 계산하는 곳은 없습니다. 그래서 어느 기기에서나 같은 지형입니다.</p>
+    </div>
+    <div class="row">
+      <h3>바위 <span class="b" id="bRocks">–</span></h3>
+      <div class="pills"><span class="pill store">메쉬 4종 (손 모델링 역할)</span><span class="arr">+</span><span class="pill calc">배치 규칙</span><span class="arr">→</span><span class="pill bake">배치 배열</span><span class="arr">→</span><span class="pill calc">인스턴싱 · 셰이더 디테일</span></div>
+      <p>경사 0.35 이상에만 놓는 규칙으로 배치하고 배열로 저장합니다. <strong>충돌 판정이 같은 배열을 읽기</strong> 때문에 저장이 필요합니다. 표면의 울퉁불퉁함은 프래그먼트 셰이더가 노이즈로 계산합니다.</p>
+    </div>
+    <div class="row">
+      <h3>풀 <span class="b" id="bGrass">–</span></h3>
+      <div class="pills"><span class="pill store">풀잎 메쉬 1개 (114 B)</span><span class="arr">+</span><span class="pill calc">시드로 로드 시 생성</span><span class="arr">+</span><span class="pill calc">GPU 흔들림 · 밟힘</span></div>
+      <p>풀은 <strong>눈에만 보이고 아무 시스템도 읽지 않으므로</strong> 배치를 저장하지 않습니다. 시드 8바이트에서 로드할 때 생성합니다. 바람과 플레이어가 밟을 때의 눕는 동작은 버텍스 셰이더가 계산합니다.</p>
+    </div>
+    <div class="row">
+      <h3>수정 <span class="b" id="bCrystal">–</span></h3>
+      <div class="pills"><span class="pill store">손으로 쓴 메쉬 (정점 6개)</span><span class="arr">+</span><span class="pill store">디자이너가 놓은 좌표 12개</span><span class="arr">+</span><span class="pill calc">회전 · 발광</span></div>
+      <p>게임의 목표물은 규칙으로 뿌리지 않습니다. <strong>레벨 디자이너가 좌표를 직접 찍습니다.</strong> 높이만 지형 파일에서 읽어 바닥에 붙입니다. 소스에 정점 좌표가 숫자 배열로 그대로 들어 있습니다.</p>
+    </div>
+    <div class="row">
+      <h3>플레이어 <span class="b" id="bPlayer">–</span></h3>
+      <div class="pills"><span class="pill store">구 메쉬 1,280 삼각형</span><span class="arr">+</span><span class="pill calc">셰이더 무늬 · 구르기 회전</span></div>
+      <p>무늬는 텍스처가 아니라 <strong>로컬 좌표의 사인 곱</strong>으로 계산합니다. 굴러가는 회전은 속도와 반지름에서 매 프레임 행렬로 누적합니다.</p>
+    </div>
+    <div class="row">
+      <h3>하늘·구름·물 <span class="b" id="bSky">0 B</span></h3>
+      <div class="pills"><span class="pill calc">레이 방향마다 노이즈 (데모씬 기법)</span></div>
+      <p>구름은 픽셀마다 광선을 쏘아 높이 60의 평면과 만나는 점에서 노이즈를 읽습니다. 물 표면의 노멀도 노이즈 기울기입니다. <strong>디스크 0바이트</strong>이고, 비용은 화면 픽셀 수에 비례합니다.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const fmt = n => Math.round(n).toLocaleString('ko-KR');
+const fmtB = n => n < 1024 ? fmt(n) + ' B' : n < 1048576 ? (n/1024).toFixed(1) + ' KB' : (n/1048576).toFixed(2) + ' MB';
+const ema = (o, v) => o == null ? v : o*0.9 + v*0.1;
+const bytesOf = s => new TextEncoder().encode(s).length;
+
+/* ---------- WebGL ---------- */
+const canvas = $('#gl'); const gl = canvas.getContext('webgl2', { antialias: true });
+if (!gl) { $('#gpuNote').textContent = '이 브라우저는 WebGL2를 지원하지 않아 게임을 그릴 수 없습니다.'; return; }
+function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, '#version 300 es\n' + src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+let shaderBytes = 0;
+function program(vs, fs) { shaderBytes += bytesOf(vs) + bytesOf(fs);
+  const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const c = {}; return { p, u: n => (n in c) ? c[n] : (c[n] = gl.getUniformLocation(p, n)), a: n => gl.getAttribLocation(p, n) }; }
+function buffer(target, data, usage) { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, usage || gl.STATIC_DRAW); return b; }
+function attrib(loc, buf, size, div) { if (loc < 0) return; gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(loc, div || 0); }
+function makeTimer() { const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); if (!ext) return null; const pend = []; let last = null, open = false;
+  return { begin() { if (open) return; const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); pend.push(q); open = true; },
+    end() { if (!open) return; gl.endQuery(ext.TIME_ELAPSED_EXT); open = false; },
+    poll() { while (pend.length) { const q = pend[0], av = gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE), dis = gl.getParameter(ext.GPU_DISJOINT_EXT);
+      if (av && !dis) last = gl.getQueryParameter(q, gl.QUERY_RESULT)/1e6; if (av || dis) { gl.deleteQuery(q); pend.shift(); } else break; } return last; } }; }
+const timer = makeTimer();
+function perspective(fovy, aspect, near, far) { const f = 1/Math.tan(fovy/2), nf = 1/(near-far); return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]); }
+function lookAt(e, c, up) { let zx=e[0]-c[0], zy=e[1]-c[1], zz=e[2]-c[2]; let l=Math.hypot(zx,zy,zz); zx/=l; zy/=l; zz/=l;
+  let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx; l=Math.hypot(xx,xy,xz); xx/=l; xy/=l; xz/=l;
+  const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+  return new Float32Array([xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0, -(xx*e[0]+xy*e[1]+xz*e[2]), -(yx*e[0]+yy*e[1]+yz*e[2]), -(zx*e[0]+zy*e[1]+zz*e[2]), 1]); }
+function mul(a, b) { const o = new Float32Array(16); for (let i=0;i<4;i++) for (let j=0;j<4;j++) o[j*4+i] = a[i]*b[j*4]+a[4+i]*b[j*4+1]+a[8+i]*b[j*4+2]+a[12+i]*b[j*4+3]; return o; }
+
+/* ---------- 노이즈 (JS와 GLSL 동일) ---------- */
+const fract = x => x - Math.floor(x);
+function hash2(x, y) { let a=fract(x*0.1031), b=fract(y*0.1031), c=fract(x*0.1031); const d=a*(b+33.33)+b*(c+33.33)+c*(a+33.33); a+=d; b+=d; c+=d; return fract((a+b)*c); }
+function noise2(x, y) { const ix=Math.floor(x), iy=Math.floor(y), fx=x-ix, fy=y-iy, ux=fx*fx*(3-2*fx), uy=fy*fy*(3-2*fy);
+  const a=hash2(ix,iy), b=hash2(ix+1,iy), c=hash2(ix,iy+1), d=hash2(ix+1,iy+1); return (a+(b-a)*ux)*(1-uy)+(c+(d-c)*ux)*uy; }
+function fbm2(x, y, oct) { let h=0, a=0.5, f=1; for (let i=0;i<oct;i++){ h+=a*noise2(x*f,y*f); f*=2.1; a*=0.5; } return h; }
+function hash3(x, y, z) { let a=fract(x*0.1031), b=fract(y*0.1031), c=fract(z*0.1031); const d=a*(c+31.32)+b*(b+31.32)+c*(a+31.32); a+=d; b+=d; c+=d; return fract((a+b)*c); }
+function noise3(x, y, z) { const ix=Math.floor(x), iy=Math.floor(y), iz=Math.floor(z); let fx=x-ix, fy=y-iy, fz=z-iz; fx=fx*fx*(3-2*fx); fy=fy*fy*(3-2*fy); fz=fz*fz*(3-2*fz);
+  const l=(a,b,t)=>a+(b-a)*t;
+  return l(l(l(hash3(ix,iy,iz),hash3(ix+1,iy,iz),fx), l(hash3(ix,iy+1,iz),hash3(ix+1,iy+1,iz),fx), fy), l(l(hash3(ix,iy,iz+1),hash3(ix+1,iy,iz+1),fx), l(hash3(ix,iy+1,iz+1),hash3(ix+1,iy+1,iz+1),fx), fy), fz); }
+function fbm3(x, y, z, oct) { let h=0, a=0.5, f=1; for (let i=0;i<oct;i++){ h+=a*noise3(x*f,y*f,z*f); f*=2; a*=0.5; } return h; }
+const GLSL_NOISE = `
+float hash2(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*0.1031); p3 += dot(p3, p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+float noise2(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(hash2(i), hash2(i+vec2(1,0)), u.x), mix(hash2(i+vec2(0,1)), hash2(i+vec2(1,1)), u.x), u.y); }
+float fbm2(vec2 p, int oct){ float h = 0.0, a = 0.5, f = 1.0; for(int i=0;i<8;i++){ if(i>=oct) break; h += a*noise2(p*f); f *= 2.1; a *= 0.5; } return h; }
+float hash3(vec3 p){ p = fract(p*0.1031); p += dot(p, p.zyx+31.32); return fract((p.x+p.y)*p.z); }
+float noise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(mix(hash3(i), hash3(i+vec3(1,0,0)), f.x), mix(hash3(i+vec3(0,1,0)), hash3(i+vec3(1,1,0)), f.x), f.y),
+             mix(mix(hash3(i+vec3(0,0,1)), hash3(i+vec3(1,0,1)), f.x), mix(hash3(i+vec3(0,1,1)), hash3(i+vec3(1,1,1)), f.x), f.y), f.z); }
+float fbm3(vec3 p, int oct){ float h = 0.0, a = 0.5, f = 1.0; for(int i=0;i<6;i++){ if(i>=oct) break; h += a*noise3(p*f); f *= 2.0; a *= 0.5; } return h; }
+`;
+const GLSL_LIGHT = `
+const vec3 SUN = normalize(vec3(0.55,0.6,-0.5));
+vec3 sky(vec3 rd){ return mix(vec3(0.93,0.78,0.60), vec3(0.33,0.52,0.84), smoothstep(-0.05, 0.45, rd.y)); }
+vec3 lit(vec3 albedo, vec3 n){ return albedo * (max(dot(n,SUN),0.0)*vec3(1.0,0.92,0.78) + (0.55+0.45*n.y)*vec3(0.42,0.5,0.62)*0.7); }
+vec3 fog(vec3 col, vec3 cam, vec3 p){ vec3 rd = normalize(p-cam); float t = length(p-cam); return mix(col, sky(rd)*0.92+0.08, 1.0-exp(-0.00035*t*t)); }
+`;
+
+/* ---------- 레벨 상수 ---------- */
+const EXT = 40, GRID = 160, N = GRID + 1, WATER = -1.2;
+const TP = { freq: 0.045, oct: 5, amp: 7, seed: 4 };
+const CRYSTAL_SPOTS = [[8,5],[-10,7],[14,-9],[-16,-12],[22,16],[-24,3],[5,-22],[-6,24],[28,-20],[-30,-26],[18,30],[-28,22]];   // 디자이너가 찍은 좌표
+const GRASS_SEED = 1234;
+
+/* ---------- 지형: 생성 → 베이크 → 저장 ---------- */
+const heights = new Float32Array(N*N);   // ← 이것이 terrain.r16 의 내용
+(function bakeTerrain() { let k = 0; for (let j=0;j<N;j++) for (let i=0;i<N;i++) {
+  const x = (i/GRID*2-1)*EXT, z = (j/GRID*2-1)*EXT; heights[k++] = (fbm2(x*TP.freq + TP.seed*17.3, z*TP.freq + TP.seed*31.7, TP.oct) - 0.5) * TP.amp; } })();
+function groundH(x, z) {   // 런타임의 유일한 높이 질의: 저장된 배열 보간
+  const u = (x/EXT+1)*0.5*GRID, v = (z/EXT+1)*0.5*GRID;
+  const i = Math.min(GRID-1, Math.max(0, Math.floor(u))), j = Math.min(GRID-1, Math.max(0, Math.floor(v)));
+  const fu = Math.min(1, Math.max(0, u-i)), fv = Math.min(1, Math.max(0, v-j));
+  const a = heights[j*N+i], b = heights[j*N+i+1], c = heights[(j+1)*N+i], d = heights[(j+1)*N+i+1];
+  return (a+(b-a)*fu)*(1-fv) + (c+(d-c)*fu)*fv;
+}
+function slopeAt(x, z) { const e = 0.3; return Math.hypot((groundH(x+e,z)-groundH(x-e,z))/(2*e), (groundH(x,z+e)-groundH(x,z-e))/(2*e)); }
+const TERRAIN_VS = `in vec2 aXZ; in float aH; uniform mat4 uVP; out vec3 vPos;
+void main(){ vec3 p = vec3(aXZ.x, aH, aXZ.y); vPos = p; gl_Position = uVP*vec4(p,1.0); }`;
+const TERRAIN_FS = `precision highp float; in vec3 vPos; uniform vec3 uCam, uPlayer; uniform float uWater; out vec4 fragColor;
+${GLSL_NOISE}${GLSL_LIGHT}
+void main(){
+  vec3 n = normalize(cross(dFdx(vPos), dFdy(vPos)));
+  float slope = 1.0 - n.y;
+  vec3 sand = mix(vec3(0.82,0.66,0.44), vec3(0.94,0.83,0.62), noise2(vPos.xz*1.3));
+  vec3 grass = mix(vec3(0.30,0.42,0.16), vec3(0.46,0.56,0.22), noise2(vPos.xz*0.6));
+  vec3 rock = vec3(0.46,0.41,0.37);
+  vec3 alb = mix(sand, grass, smoothstep(uWater+0.3, uWater+1.4, vPos.y));
+  alb = mix(alb, rock, smoothstep(0.3, 0.55, slope));
+  vec3 col = lit(alb, n);
+  float sh = smoothstep(0.95, 0.25, distance(vPos.xz, uPlayer.xz)) * step(vPos.y, uPlayer.y+0.1);   // 플레이어 그림자
+  col *= 1.0 - 0.55*sh;
+  fragColor = vec4(clamp(fog(col, uCam, vPos),0.0,1.0), 1.0);
+}`;
+const terrainProg = program(TERRAIN_VS, TERRAIN_FS);
+const terrain = (() => {
+  const xz = new Float32Array(N*N*2); let k = 0;
+  for (let j=0;j<N;j++) for (let i=0;i<N;i++) { xz[k++] = (i/GRID*2-1)*EXT; xz[k++] = (j/GRID*2-1)*EXT; }
+  const idx = new Uint32Array(GRID*GRID*6); k = 0;
+  for (let j=0;j<GRID;j++) for (let i=0;i<GRID;i++) { const a=j*N+i, b=a+N; idx[k++]=a; idx[k++]=b; idx[k++]=a+1; idx[k++]=a+1; idx[k++]=b; idx[k++]=b+1; }
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  attrib(terrainProg.a('aXZ'), buffer(gl.ARRAY_BUFFER, xz), 2); attrib(terrainProg.a('aH'), buffer(gl.ARRAY_BUFFER, heights), 1);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer(gl.ELEMENT_ARRAY_BUFFER, idx)); gl.bindVertexArray(null);
+  return { vao, count: idx.length, tris: GRID*GRID*2, bytes: N*N*2 };
+})();
+
+/* ---------- 하늘: 레이마칭 구름 ---------- */
+const SKY_VS = `const vec2 V[3] = vec2[3](vec2(-1,-1), vec2(3,-1), vec2(-1,3)); out vec2 vUV; void main(){ vUV = V[gl_VertexID]; gl_Position = vec4(V[gl_VertexID], 0.9999, 1.0); }`;
+const SKY_FS = `precision highp float; in vec2 vUV; uniform vec3 uCam, uFwd, uRight, uUp; uniform float uTanH, uAspect, uTime, uClouds; out vec4 fragColor;
+${GLSL_NOISE}${GLSL_LIGHT}
+void main(){
+  vec3 rd = normalize(uFwd + vUV.x*uAspect*uTanH*uRight + vUV.y*uTanH*uUp);
+  vec3 col = sky(rd);
+  col += vec3(1.0,0.9,0.7) * pow(max(dot(rd,SUN),0.0), 300.0) * 1.5 + vec3(1.0,0.8,0.6)*pow(max(dot(rd,SUN),0.0), 8.0)*0.15;
+  if(uClouds > 0.5 && rd.y > 0.005){
+    float t = (60.0 - uCam.y) / rd.y; vec2 p = (uCam.xz + rd.xz*t)*0.0045 + uTime*0.012;
+    float c = smoothstep(0.46, 0.72, fbm2(p, 5));
+    col = mix(col, vec3(1.0,0.98,0.95), c * smoothstep(0.0, 0.12, rd.y));
+  }
+  fragColor = vec4(col, 1.0);
+}`;
+const skyProg = program(SKY_VS, SKY_FS);
+
+/* ---------- 물: 노이즈 노멀 ---------- */
+const WATER_VS = `in vec2 aXZ; uniform mat4 uVP; uniform float uWater; out vec3 vPos; void main(){ vPos = vec3(aXZ.x, uWater, aXZ.y); gl_Position = uVP*vec4(vPos,1.0); }`;
+const WATER_FS = `precision highp float; in vec3 vPos; uniform vec3 uCam; uniform float uTime; out vec4 fragColor;
+${GLSL_NOISE}${GLSL_LIGHT}
+void main(){
+  vec2 q = vPos.xz*0.6 + vec2(uTime*0.15, uTime*0.1); float e = 0.05;
+  float h0 = fbm2(q,3), hx = fbm2(q+vec2(e,0),3), hz = fbm2(q+vec2(0,e),3);
+  vec3 n = normalize(vec3(-(hx-h0)/e*0.25, 1.0, -(hz-h0)/e*0.25));
+  vec3 rd = normalize(vPos-uCam); vec3 r = reflect(rd, n);
+  float fre = pow(1.0-max(dot(-rd,n),0.0), 3.0);
+  vec3 col = mix(vec3(0.08,0.32,0.38), sky(r), 0.35 + 0.6*fre) + pow(max(dot(r,SUN),0.0), 60.0)*0.6;
+  fragColor = vec4(clamp(fog(col, uCam, vPos),0.0,1.0), 0.82);
+}`;
+const waterProg = program(WATER_VS, WATER_FS);
+const waterVao = gl.createVertexArray(); gl.bindVertexArray(waterVao);
+attrib(waterProg.a('aXZ'), buffer(gl.ARRAY_BUFFER, new Float32Array([-EXT,-EXT, -EXT,EXT, EXT,-EXT, EXT,-EXT, -EXT,EXT, EXT,EXT])), 2); gl.bindVertexArray(null);
+
+/* ---------- 이코사구 ---------- */
+function icosphere(level) {
+  const t = (1+Math.sqrt(5))/2;
+  let verts = [[-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],[0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],[t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]].map(v => { const l = Math.hypot(...v); return [v[0]/l, v[1]/l, v[2]/l]; });
+  let faces = [[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+  for (let l=0;l<level;l++) { const cache = new Map(), nf = [];
+    const mid = (a,b) => { const k = a<b ? a*1e6+b : b*1e6+a; if (cache.has(k)) return cache.get(k); const v = [verts[a][0]+verts[b][0], verts[a][1]+verts[b][1], verts[a][2]+verts[b][2]], len = Math.hypot(...v); verts.push([v[0]/len, v[1]/len, v[2]/len]); cache.set(k, verts.length-1); return verts.length-1; };
+    for (const [a,b,c] of faces) { const ab=mid(a,b), bc=mid(b,c), ca=mid(c,a); nf.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]); } faces = nf; }
+  const dir = new Float32Array(verts.length*3); verts.forEach((v,i) => dir.set(v, i*3));
+  const idx = new Uint16Array(faces.length*3); faces.forEach((f,i) => idx.set(f, i*3));
+  return { dir, idx };
+}
+function smoothNormals(pos, idx) { const n = new Float32Array(pos.length);
+  for (let i=0;i<idx.length;i+=3) { const a=idx[i]*3, b=idx[i+1]*3, c=idx[i+2]*3;
+    const ux=pos[b]-pos[a], uy=pos[b+1]-pos[a+1], uz=pos[b+2]-pos[a+2], vx=pos[c]-pos[a], vy=pos[c+1]-pos[a+1], vz=pos[c+2]-pos[a+2];
+    const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx; for (const k of [a,b,c]) { n[k]+=nx; n[k+1]+=ny; n[k+2]+=nz; } }
+  for (let i=0;i<n.length;i+=3) { const l = Math.hypot(n[i],n[i+1],n[i+2])||1; n[i]/=l; n[i+1]/=l; n[i+2]/=l; } return n; }
+
+/* ---------- 바위: 메쉬 4종 + 규칙 배치 → 배열 저장 + 인스턴싱 ---------- */
+const ROCK_VS = `in vec3 aPos; in vec3 aNrm; in vec4 aI0; in vec2 aI1;
+uniform mat4 uVP; uniform float uInst; uniform vec4 uI0; uniform vec2 uI1; out vec3 vPos; out vec3 vNrm; out vec3 vLocal; out float vShade;
+void main(){ vec4 i0 = uInst>0.5 ? aI0 : uI0; vec2 i1 = uInst>0.5 ? aI1 : uI1;
+  float c = cos(i1.x), s = sin(i1.x); mat3 R = mat3(c,0.0,-s, 0.0,1.0,0.0, s,0.0,c);
+  vec3 p = R*(aPos*i0.w) + i0.xyz; vPos = p; vNrm = R*aNrm; vLocal = aPos; vShade = i1.y; gl_Position = uVP*vec4(p,1.0); }`;
+const ROCK_FS = `precision highp float; in vec3 vPos; in vec3 vNrm; in vec3 vLocal; in float vShade; uniform vec3 uCam; out vec4 fragColor;
+${GLSL_NOISE}${GLSL_LIGHT}
+void main(){
+  vec3 n = normalize(vNrm); float e = 0.02; vec3 p = vLocal*7.0;          // 셰이더 디테일 (패턴 2)
+  float f0 = fbm3(p,2); vec3 g = vec3(fbm3(p+vec3(e,0,0),2)-f0, fbm3(p+vec3(0,e,0),2)-f0, fbm3(p+vec3(0,0,e),2)-f0)/e;
+  n = normalize(n - 0.25*(g - n*dot(g,n)));
+  vec3 col = lit(mix(vec3(0.44,0.39,0.35), vec3(0.6,0.54,0.47), vShade), n);
+  fragColor = vec4(clamp(fog(col, uCam, vPos),0.0,1.0), 1.0);
+}`;
+const rockProg = program(ROCK_VS, ROCK_FS);
+const rockShape = seed => (x,y,z) => 1 + 0.35*(fbm3(x*1.6+seed*7.1, y*1.6+seed*3.3, z*1.6, 3)-0.5) - 0.12*(fbm3(x*4+seed, y*4, z*4+seed, 2)-0.5);
+const rocks = [], rockBase = icosphere(2); let rockMeshBytes = 0;
+for (let k=0;k<4;k++) {
+  const pos = new Float32Array(rockBase.dir.length), fn = rockShape(k+1);
+  for (let i=0;i<pos.length;i+=3) { const x=rockBase.dir[i], y=rockBase.dir[i+1], z=rockBase.dir[i+2], r=fn(x,y,z); pos[i]=x*r; pos[i+1]=y*r; pos[i+2]=z*r; }
+  const nrm = smoothNormals(pos, rockBase.idx), vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  attrib(rockProg.a('aPos'), buffer(gl.ARRAY_BUFFER, pos), 3); attrib(rockProg.a('aNrm'), buffer(gl.ARRAY_BUFFER, nrm), 3);
+  const ib0 = buffer(gl.ARRAY_BUFFER, new Float32Array(4)), ib1 = buffer(gl.ARRAY_BUFFER, new Float32Array(2));
+  attrib(rockProg.a('aI0'), ib0, 4, 1); attrib(rockProg.a('aI1'), ib1, 2, 1);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer(gl.ELEMENT_ARRAY_BUFFER, rockBase.idx)); gl.bindVertexArray(null);
+  rockMeshBytes += pos.byteLength + nrm.byteLength + rockBase.idx.byteLength;
+  rocks.push({ vao, ib0, ib1, count: rockBase.idx.length, n: 0, i0: null, i1: null });
+}
+const rockList = [];   // ← 배치 배열 (저장). 충돌 판정도 이것을 읽는다
+(function placeRocks() {
+  const lists = [[],[],[],[]], cell = 1.15;
+  for (let gz=-EXT+2; gz<EXT-2; gz+=cell) for (let gx=-EXT+2; gx<EXT-2; gx+=cell) {
+    const h1=hash2(gx*7.7+3, gz*3.1), h2=hash2(gx*1.3, gz*9.9+3), h3=hash2(gx+6, gz*0.7), h4=hash2(gz, gx);
+    const x = gx+(h1-0.5)*cell, z = gz+(h2-0.5)*cell, h = groundH(x,z);
+    if (h < WATER - 0.2 || slopeAt(x,z) < 0.35 || h3 > 0.55) continue;       // 규칙
+    if (Math.hypot(x,z) < 4) continue;                                           // 스폰 지점 비우기
+    if (CRYSTAL_SPOTS.some(c => Math.hypot(x-c[0], z-c[1]) < 2.2)) continue;    // 수정 주변 비우기
+    const s = 0.5 + h1*0.9, type = Math.floor(h4*4)&3;
+    lists[type].push(x, h + s*0.25, z, s, h2*6.283, h3); rockList.push({ x, z, r: s*0.85 });
+  }
+  lists.forEach((l,k) => { const r = rocks[k], n = l.length/6; r.n = n; r.i0 = new Float32Array(n*4); r.i1 = new Float32Array(n*2);
+    for (let i=0;i<n;i++) { r.i0.set(l.slice(i*6,i*6+4), i*4); r.i1.set(l.slice(i*6+4,i*6+6), i*2); }
+    gl.bindBuffer(gl.ARRAY_BUFFER, r.ib0); gl.bufferData(gl.ARRAY_BUFFER, r.i0, gl.STATIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER, r.ib1); gl.bufferData(gl.ARRAY_BUFFER, r.i1, gl.STATIC_DRAW); });
+})();
+
+/* ---------- 풀: 풀잎 메쉬 1개 + 시드로 생성 + GPU 흔들림·밟힘 ---------- */
+const GRASS_VS = `in vec3 aPos; in vec4 aG0; in vec3 aG1;   // aG0: 뿌리 x y z, yaw / aG1: 위상, 색, 높이
+uniform mat4 uVP; uniform float uTime, uInst, uBend; uniform vec3 uPlayer; uniform vec4 uG0; uniform vec3 uG1; out float vF; out float vTint;
+void main(){ vec4 g0 = uInst>0.5 ? aG0 : uG0; vec3 g1 = uInst>0.5 ? aG1 : uG1;
+  float f = aPos.y; float c = cos(g0.w), s = sin(g0.w);
+  vec3 lp = vec3(aPos.x*0.09*c, aPos.y*g1.z, aPos.x*0.09*s);
+  vec3 root = g0.xyz;
+  float sw = sin(uTime*2.0 + root.x*0.5 + root.z*0.3 + g1.x);
+  lp.xz += 0.25 * f*f * sw * vec2(1.0, 0.3);                                   // 바람
+  vec2 d = root.xz - uPlayer.xz; float L = length(d); float bend = uBend * smoothstep(1.4, 0.2, L) * f;   // 밟힘
+  lp.xz += (L > 0.001 ? d/L : vec2(1,0)) * bend * 0.7; lp.y *= 1.0 - 0.6*bend;
+  vF = f; vTint = g1.y; gl_Position = uVP*vec4(root + lp, 1.0); }`;
+const GRASS_FS = `precision highp float; in float vF; in float vTint; out vec4 fragColor;
+void main(){ vec3 c = mix(vec3(0.18,0.32,0.11), vec3(0.58,0.70,0.26), vF) * (0.8 + 0.35*vTint); fragColor = vec4(c,1.0); }`;
+const grassProg = program(GRASS_VS, GRASS_FS);
+const grass = (() => {
+  const pos = [], idx = [0,1,2, 1,3,2, 2,3,4, 3,5,4, 4,5,6];       // 풀잎 메쉬: 정점 7, 삼각형 5
+  for (let k=0;k<3;k++) { const y = k/3, sh = (1-k/3)*0.5; pos.push(-sh, y, 0, sh, y, 0); } pos.push(0, 1, 0);
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  attrib(grassProg.a('aPos'), buffer(gl.ARRAY_BUFFER, new Float32Array(pos)), 3);
+  const g0 = [], g1 = [], cell = 0.36; let i = 0;                       // 시드에서 생성 (디스크 8 B)
+  for (let gz=-EXT+1; gz<EXT-1; gz+=cell) for (let gx=-EXT+1; gx<EXT-1; gx+=cell) {
+    const a = hash2(gx*3.1+GRASS_SEED, gz*5.7), b = hash2(gx*9.3, gz*1.7+GRASS_SEED), c = hash2(gx+GRASS_SEED, gz);
+    const x = gx+(a-0.5)*cell, z = gz+(b-0.5)*cell, h = groundH(x,z);
+    if (h < WATER+0.25 || h > 2.6 || slopeAt(x,z) > 0.5 || c > 0.7) continue;
+    g0.push(x, h, z, b*6.283); g1.push(c*6.283, a, 0.35 + a*0.45); i++;
+  }
+  const b0 = buffer(gl.ARRAY_BUFFER, new Float32Array(g0)), b1 = buffer(gl.ARRAY_BUFFER, new Float32Array(g1));
+  attrib(grassProg.a('aG0'), b0, 4, 1); attrib(grassProg.a('aG1'), b1, 3, 1);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx))); gl.bindVertexArray(null);
+  return { vao, n: i, count: idx.length, g0: new Float32Array(g0), g1: new Float32Array(g1), meshBytes: pos.length*4 + idx.length*2 };
+})();
+
+/* ---------- 수정: 손으로 쓴 메쉬 + 디자이너 좌표 ---------- */
+// crystal.obj 에 해당하는 내용. 정점 6개, 삼각형 8개. 이것이 "저장된 자산"의 전부.
+const CRYSTAL_POS = new Float32Array([ 0,0.9,0,   0.3,0.25,0,   0,0.25,0.3,   -0.3,0.25,0,   0,0.25,-0.3,   0,-0.35,0 ]);
+const CRYSTAL_IDX = new Uint16Array([ 0,2,1, 0,3,2, 0,4,3, 0,1,4,  5,1,2, 5,2,3, 5,3,4, 5,4,1 ]);
+const CRYSTAL_VS = `in vec3 aPos; in vec4 aC; uniform mat4 uVP; uniform float uTime; out vec3 vPos; out float vOn;
+void main(){ float a = uTime*1.6 + aC.x; float c = cos(a), s = sin(a);
+  vec3 p = vec3(c*aPos.x - s*aPos.z, aPos.y + 0.12*sin(uTime*2.2 + aC.z), s*aPos.x + c*aPos.z);
+  p = p*aC.w + aC.xyz + vec3(0.0, 0.7, 0.0); vPos = p; vOn = aC.w; gl_Position = uVP*vec4(p,1.0); }`;
+const CRYSTAL_FS = `precision highp float; in vec3 vPos; in float vOn; uniform vec3 uCam; out vec4 fragColor; ${GLSL_LIGHT}
+void main(){ if(vOn < 0.5) discard; vec3 n = normalize(cross(dFdx(vPos), dFdy(vPos))); vec3 rd = normalize(vPos-uCam);
+  float fre = pow(1.0-max(dot(-rd,n),0.0), 2.0); vec3 col = lit(vec3(0.15,0.85,0.8), n) + fre*vec3(0.6,1.0,0.95) + vec3(0.1,0.5,0.45);
+  fragColor = vec4(clamp(col,0.0,1.0), 1.0); }`;
+const crystalProg = program(CRYSTAL_VS, CRYSTAL_FS);
+const crystals = (() => {
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  attrib(crystalProg.a('aPos'), buffer(gl.ARRAY_BUFFER, CRYSTAL_POS), 3);
+  const inst = new Float32Array(CRYSTAL_SPOTS.length*4), list = [];
+  CRYSTAL_SPOTS.forEach((c,i) => { const y = Math.max(groundH(c[0],c[1]), WATER+0.3); inst.set([c[0], y, c[1], 1], i*4); list.push({ x:c[0], y, z:c[1], on:true }); });
+  const ibuf = buffer(gl.ARRAY_BUFFER, inst, gl.DYNAMIC_DRAW); attrib(crystalProg.a('aC'), ibuf, 4, 1);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer(gl.ELEMENT_ARRAY_BUFFER, CRYSTAL_IDX)); gl.bindVertexArray(null);
+  return { vao, inst, ibuf, list, count: CRYSTAL_IDX.length, bytes: CRYSTAL_POS.byteLength + CRYSTAL_IDX.byteLength + CRYSTAL_SPOTS.length*8 };
+})();
+
+/* ---------- 플레이어: 구 메쉬 + 셰이더 무늬 + 구르기 ---------- */
+const PLAYER_VS = `in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos; out vec3 vPos; out vec3 vNrm; out vec3 vLocal;
+void main(){ vec3 p = uRot*aPos*0.5 + uPos; vPos = p; vNrm = uRot*aPos; vLocal = aPos; gl_Position = uVP*vec4(p,1.0); }`;
+const PLAYER_FS = `precision highp float; in vec3 vPos; in vec3 vNrm; in vec3 vLocal; uniform vec3 uCam; out vec4 fragColor; ${GLSL_LIGHT}
+void main(){ float k = sin(7.0*vLocal.x)*sin(7.0*vLocal.y)*sin(7.0*vLocal.z);   // 무늬: 텍스처 없이 계산
+  vec3 alb = k > 0.0 ? vec3(0.95,0.45,0.12) : vec3(0.96,0.92,0.84);
+  vec3 n = normalize(vNrm); vec3 rd = normalize(vPos-uCam); float spec = pow(max(dot(reflect(rd,n),SUN),0.0), 30.0);
+  fragColor = vec4(clamp(fog(lit(alb,n) + spec*0.4, uCam, vPos),0.0,1.0), 1.0); }`;
+const playerProg = program(PLAYER_VS, PLAYER_FS);
+const playerMesh = (() => { const s = icosphere(3), vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  attrib(playerProg.a('aPos'), buffer(gl.ARRAY_BUFFER, s.dir), 3); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer(gl.ELEMENT_ARRAY_BUFFER, s.idx)); gl.bindVertexArray(null);
+  return { vao, count: s.idx.length, tris: s.idx.length/3, bytes: s.dir.byteLength*2 + s.idx.byteLength }; })();
+
+/* ---------- 미니맵: 같은 heights 배열 ---------- */
+const miniBase = document.createElement('canvas'); miniBase.width = miniBase.height = N;
+(function drawMiniBase() { const ctx = miniBase.getContext('2d'), img = ctx.createImageData(N, N);
+  for (let j=0;j<N;j++) for (let i=0;i<N;i++) { const h = heights[j*N+i], o = (j*N+i)*4; let r,g,b;
+    if (h < WATER) { r=30; g=90; b=120; } else { const t = Math.min(1, (h-WATER)/5); r = 120+90*t; g = 110+70*t; b = 70+60*t; if (h < WATER+1) { r=200; g=170; b=110; } }
+    img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255; }
+  ctx.putImageData(img, 0, 0); })();
+const miniCtx = $('#mini').getContext('2d');
+function drawMini() {
+  miniCtx.drawImage(miniBase, 0, 0); const toPx = v => (v/EXT+1)*0.5*N;
+  miniCtx.fillStyle = '#3ff0dc'; for (const c of crystals.list) if (c.on) { miniCtx.beginPath(); miniCtx.arc(toPx(c.x), toPx(c.z), 3, 0, 6.283); miniCtx.fill(); }
+  miniCtx.fillStyle = '#ff6a1a'; miniCtx.beginPath(); miniCtx.arc(toPx(P.x), toPx(P.z), 4, 0, 6.283); miniCtx.fill();
+  miniCtx.strokeStyle = '#fff'; miniCtx.lineWidth = 1; miniCtx.stroke();
+}
+
+/* ---------- 게임 상태 ---------- */
+const P = { x: 0, z: 0, y: 0, vx: 0, vz: 0, rot: new Float32Array([1,0,0, 0,1,0, 0,0,1]), heading: 0 };
+const cam = { yaw: Math.PI*0.5, pitch: 0.42, dist: 7.5, pos: [0,5,-7], target: [0,0,0] };
+const game = { score: 0, time: 0, done: false, started: false };
+const opt = { inst: true, clouds: true, bend: true };
+const keys = {}; let stick = null;
+let T = 0, gpuMs = null, cpuMs = null;
+
+function restart() {
+  P.x = 0; P.z = 0; P.vx = 0; P.vz = 0; P.rot.set([1,0,0, 0,1,0, 0,0,1]); P.heading = 0;
+  game.score = 0; game.time = 0; game.done = false; game.started = false; cam.yaw = Math.PI*0.5;
+  crystals.list.forEach((c,i) => { c.on = true; crystals.inst[i*4+3] = 1; });
+  gl.bindBuffer(gl.ARRAY_BUFFER, crystals.ibuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, crystals.inst);
+  $('#msg').hidden = true; $('#hudScore').textContent = `수정 0 / ${crystals.list.length}`;
+}
+function rotAxis(ax, ang, R) {   // R = rot(ax, ang) * R
+  const [x,y,z] = ax, c = Math.cos(ang), s = Math.sin(ang), t = 1-c;
+  const A = [t*x*x+c, t*x*y+s*z, t*x*z-s*y,  t*x*y-s*z, t*y*y+c, t*y*z+s*x,  t*x*z+s*y, t*y*z-s*x, t*z*z+c];   // column-major
+  const o = new Float32Array(9);
+  for (let col=0; col<3; col++) for (let row=0; row<3; row++) o[col*3+row] = A[row]*R[col*3] + A[3+row]*R[col*3+1] + A[6+row]*R[col*3+2];
+  R.set(o);
+}
+function update(dt) {
+  const t0 = performance.now();
+  // 입력 → 카메라 기준 이동 방향
+  const fx = -Math.cos(cam.yaw), fz = -Math.sin(cam.yaw);              // 카메라가 보는 방향 (xz)
+  const rx = -fz, rz = fx;
+  let ix = 0, iz = 0;
+  if (keys.w || keys.arrowup) { ix += fx; iz += fz; } if (keys.s || keys.arrowdown) { ix -= fx; iz -= fz; }
+  if (keys.d || keys.arrowright) { ix += rx; iz += rz; } if (keys.a || keys.arrowleft) { ix -= rx; iz -= rz; }
+  if (stick) { ix += fx*(-stick.dy) + rx*stick.dx; iz += fz*(-stick.dy) + rz*stick.dx; }
+  const il = Math.hypot(ix, iz); if (il > 1) { ix /= il; iz /= il; }
+  if (il > 0.05 && !game.done) game.started = true;
+  if (game.started && !game.done) game.time += dt;
+  // 물리: 가속, 마찰, 물에서는 느리게
+  const h = groundH(P.x, P.z), inWater = h < WATER - 0.05, speed = inWater ? 3.2 : 7.5, accel = inWater ? 10 : 26;
+  P.vx += (ix*speed - P.vx) * Math.min(1, accel*dt/speed*1.2); P.vz += (iz*speed - P.vz) * Math.min(1, accel*dt/speed*1.2);
+  if (il < 0.05) { P.vx *= Math.pow(0.02, dt); P.vz *= Math.pow(0.02, dt); }
+  let nx = P.x + P.vx*dt, nz = P.z + P.vz*dt;
+  // 바위 충돌: 저장된 배치 배열을 읽는다
+  for (const r of rockList) { const dx = nx-r.x, dz = nz-r.z, d = Math.hypot(dx,dz), min = r.r + 0.5;
+    if (d < min && d > 1e-4) { nx = r.x + dx/d*min; nz = r.z + dz/d*min; const dot = (P.vx*dx + P.vz*dz)/d; if (dot < 0) { P.vx -= dot*dx/d; P.vz -= dot*dz/d; } } }
+  nx = Math.max(-EXT+1.5, Math.min(EXT-1.5, nx)); nz = Math.max(-EXT+1.5, Math.min(EXT-1.5, nz));
+  // 구르기: 이동량 / 반지름
+  const mx = nx-P.x, mz = nz-P.z, ml = Math.hypot(mx,mz);
+  if (ml > 1e-5) { rotAxis([mz/ml, 0, -mx/ml], ml/0.5, P.rot); P.heading = Math.atan2(mz, mx); }
+  P.x = nx; P.z = nz; P.y = Math.max(groundH(P.x,P.z), WATER-0.25) + 0.5;
+  // 수정 수집
+  if (!game.done) for (let i=0;i<crystals.list.length;i++) { const c = crystals.list[i]; if (!c.on) continue;
+    if (Math.hypot(P.x-c.x, P.z-c.z) < 1.0 && Math.abs(P.y-c.y) < 2.0) { c.on = false; crystals.inst[i*4+3] = 0; game.score++;
+      gl.bindBuffer(gl.ARRAY_BUFFER, crystals.ibuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, crystals.inst);
+      $('#hudScore').textContent = `수정 ${game.score} / ${crystals.list.length}`;
+      if (game.score === crystals.list.length) { game.done = true; $('#msg').hidden = false; $('#msgSub').textContent = `${game.time.toFixed(1)}초 · R 키로 다시 시작`; } } }
+  // 카메라: 이동 방향 뒤로 천천히 따라감, 지형 아래로는 안 내려감
+  if (ml > 1e-4) { let want = P.heading + Math.PI, diff = Math.atan2(Math.sin(want-cam.yaw), Math.cos(want-cam.yaw)); cam.yaw += diff * Math.min(1, dt*1.6); }
+  cam.target = [P.x, P.y + 0.6, P.z];
+  let cx = P.x + cam.dist*Math.cos(cam.pitch)*Math.cos(cam.yaw), cz = P.z + cam.dist*Math.cos(cam.pitch)*Math.sin(cam.yaw), cy = cam.target[1] + cam.dist*Math.sin(cam.pitch);
+  cy = Math.max(cy, groundH(cx,cz) + 0.8, WATER + 0.8); cam.pos = [cx, cy, cz];
+  cpuMs = ema(cpuMs, performance.now()-t0);
+}
+
+/* ---------- 렌더 ---------- */
+function fit() { const dpr = Math.min(window.devicePixelRatio||1, 1.5), w = Math.max(1, Math.floor(canvas.clientWidth*dpr)), h = Math.max(1, Math.floor(canvas.clientHeight*dpr)); if (canvas.width!==w||canvas.height!==h) { canvas.width=w; canvas.height=h; } }
+let drawCalls = 0;
+function render() {
+  fit(); gl.viewport(0,0,canvas.width,canvas.height); gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.disable(gl.BLEND);
+  gl.clear(gl.DEPTH_BUFFER_BIT);
+  const aspect = canvas.width/canvas.height, fov = 0.9, vp = mul(perspective(fov, aspect, 0.1, 400), lookAt(cam.pos, cam.target, [0,1,0]));
+  const fwd = [cam.target[0]-cam.pos[0], cam.target[1]-cam.pos[1], cam.target[2]-cam.pos[2]], fl = Math.hypot(...fwd); fwd.forEach((v,i) => fwd[i] = v/fl);
+  const right = [fwd[2], 0, -fwd[0]], rl = Math.hypot(...right); right.forEach((v,i) => right[i] = v/rl);
+  const up = [right[1]*fwd[2]-right[2]*fwd[1], right[2]*fwd[0]-right[0]*fwd[2], right[0]*fwd[1]-right[1]*fwd[0]];
+  drawCalls = 0;
+  if (timer) timer.begin();
+  // 하늘
+  gl.depthMask(false); gl.useProgram(skyProg.p);
+  gl.uniform3fv(skyProg.u('uCam'), cam.pos); gl.uniform3fv(skyProg.u('uFwd'), fwd); gl.uniform3fv(skyProg.u('uRight'), right); gl.uniform3fv(skyProg.u('uUp'), up);
+  gl.uniform1f(skyProg.u('uTanH'), Math.tan(fov/2)); gl.uniform1f(skyProg.u('uAspect'), aspect); gl.uniform1f(skyProg.u('uTime'), T); gl.uniform1f(skyProg.u('uClouds'), opt.clouds?1:0);
+  gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3); drawCalls++; gl.depthMask(true);
+  // 지형
+  gl.useProgram(terrainProg.p); gl.bindVertexArray(terrain.vao);
+  gl.uniformMatrix4fv(terrainProg.u('uVP'), false, vp); gl.uniform3fv(terrainProg.u('uCam'), cam.pos); gl.uniform3f(terrainProg.u('uPlayer'), P.x, P.y, P.z); gl.uniform1f(terrainProg.u('uWater'), WATER);
+  gl.drawElements(gl.TRIANGLES, terrain.count, gl.UNSIGNED_INT, 0); drawCalls++;
+  // 바위
+  gl.useProgram(rockProg.p); gl.uniformMatrix4fv(rockProg.u('uVP'), false, vp); gl.uniform3fv(rockProg.u('uCam'), cam.pos); gl.uniform1f(rockProg.u('uInst'), opt.inst?1:0);
+  for (const r of rocks) { if (!r.n) continue; gl.bindVertexArray(r.vao);
+    if (opt.inst) { gl.drawElementsInstanced(gl.TRIANGLES, r.count, gl.UNSIGNED_SHORT, 0, r.n); drawCalls++; }
+    else for (let i=0;i<r.n;i++) { gl.uniform4fv(rockProg.u('uI0'), r.i0.subarray(i*4,i*4+4)); gl.uniform2fv(rockProg.u('uI1'), r.i1.subarray(i*2,i*2+2)); gl.drawElements(gl.TRIANGLES, r.count, gl.UNSIGNED_SHORT, 0); drawCalls++; } }
+  // 수정
+  gl.useProgram(crystalProg.p); gl.bindVertexArray(crystals.vao);
+  gl.uniformMatrix4fv(crystalProg.u('uVP'), false, vp); gl.uniform3fv(crystalProg.u('uCam'), cam.pos); gl.uniform1f(crystalProg.u('uTime'), T);
+  gl.drawElementsInstanced(gl.TRIANGLES, crystals.count, gl.UNSIGNED_SHORT, 0, crystals.list.length); drawCalls++;
+  // 플레이어
+  gl.useProgram(playerProg.p); gl.bindVertexArray(playerMesh.vao);
+  gl.uniformMatrix4fv(playerProg.u('uVP'), false, vp); gl.uniform3fv(playerProg.u('uCam'), cam.pos); gl.uniformMatrix3fv(playerProg.u('uRot'), false, P.rot); gl.uniform3f(playerProg.u('uPos'), P.x, P.y, P.z);
+  gl.drawElements(gl.TRIANGLES, playerMesh.count, gl.UNSIGNED_SHORT, 0); drawCalls++;
+  // 풀 (양면)
+  gl.disable(gl.CULL_FACE); gl.useProgram(grassProg.p); gl.bindVertexArray(grass.vao);
+  gl.uniformMatrix4fv(grassProg.u('uVP'), false, vp); gl.uniform1f(grassProg.u('uTime'), T); gl.uniform3f(grassProg.u('uPlayer'), P.x, P.y, P.z); gl.uniform1f(grassProg.u('uBend'), opt.bend?1:0); gl.uniform1f(grassProg.u('uInst'), opt.inst?1:0);
+  if (opt.inst) { gl.drawElementsInstanced(gl.TRIANGLES, grass.count, gl.UNSIGNED_SHORT, 0, grass.n); drawCalls++; }
+  else { const lim = Math.min(grass.n, 6000);   // 인스턴싱 없이는 전부 그리면 멈추므로 6,000개까지만
+    for (let i=0;i<lim;i++) { gl.uniform4fv(grassProg.u('uG0'), grass.g0.subarray(i*4,i*4+4)); gl.uniform3fv(grassProg.u('uG1'), grass.g1.subarray(i*3,i*3+3)); gl.drawElements(gl.TRIANGLES, grass.count, gl.UNSIGNED_SHORT, 0); drawCalls++; } }
+  // 물 (반투명)
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  gl.useProgram(waterProg.p); gl.bindVertexArray(waterVao);
+  gl.uniformMatrix4fv(waterProg.u('uVP'), false, vp); gl.uniform3fv(waterProg.u('uCam'), cam.pos); gl.uniform1f(waterProg.u('uTime'), T); gl.uniform1f(waterProg.u('uWater'), WATER);
+  gl.drawArrays(gl.TRIANGLES, 0, 6); drawCalls++;
+  gl.depthMask(true); gl.disable(gl.BLEND); gl.bindVertexArray(null);
+  if (timer) timer.end();
+  const g = timer ? timer.poll() : null; if (g != null) gpuMs = ema(gpuMs, g);
+}
+
+/* ---------- 명세표 ---------- */
+const rockCount = rocks.reduce((s,r) => s+r.n, 0), rockPlaceBytes = rockCount*24;
+const budget = [
+  { name: '지형 heightmap', bytes: terrain.bytes, color: 'var(--store)' },
+  { name: '바위 메쉬 4종', bytes: rockMeshBytes, color: 'var(--store)' },
+  { name: '바위 배치 배열', bytes: rockPlaceBytes, color: 'var(--bake)' },
+  { name: '플레이어 메쉬', bytes: playerMesh.bytes, color: 'var(--store)' },
+  { name: '셰이더 텍스트', bytes: shaderBytes, color: 'var(--calc)' },
+  { name: '풀잎·수정·시드', bytes: grass.meshBytes + 8 + crystals.bytes, color: 'var(--store)' },
+];
+const totalBytes = budget.reduce((s,b) => s+b.bytes, 0);
+$('#total').innerHTML = `${fmtB(totalBytes)}<small>디스크 총합 · 레벨 전체</small>`;
+$('#bar').innerHTML = budget.map(b => `<span style="width:${(b.bytes/totalBytes*100).toFixed(2)}%;background:${b.color}" title="${b.name} ${fmtB(b.bytes)}"></span>`).join('');
+$('#barLegend').innerHTML = budget.map(b => `<span><i style="background:${b.color}"></i>${b.name} ${fmtB(b.bytes)}</span>`).join('');
+$('#bTerrain').textContent = `${fmtB(terrain.bytes)} · 삼각형 ${fmt(terrain.tris)}`;
+$('#bRocks').textContent = `${rockCount}개 · 메쉬 ${fmtB(rockMeshBytes)} + 배치 ${fmtB(rockPlaceBytes)}`;
+$('#bGrass').textContent = `${fmt(grass.n)}개 · 디스크 ${fmtB(grass.meshBytes + 8)}`;
+$('#bCrystal').textContent = `${crystals.list.length}개 · ${fmtB(crystals.bytes)}`;
+$('#bPlayer').textContent = fmtB(playerMesh.bytes);
+$('#bSky').textContent = `0 B · 셰이더 텍스트 전체 ${fmtB(shaderBytes)}`;
+const sceneTris = terrain.tris + rockCount*320 + grass.n*5 + crystals.list.length*8 + playerMesh.tris + 2;
+$('#gpuNote').textContent = timer ? 'GPU 타이머 사용 가능: GPU 시간은 실제 측정값입니다.' : 'GPU 타이머 미지원 브라우저: GPU 시간은 표시되지 않습니다.';
+
+/* ---------- 입력 ---------- */
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (e.target.tagName === 'INPUT') return;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  keys[k] = true; if (k === 'r') restart(); });
+addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+const stickEl = $('#stick'); let stickOrigin = null;
+canvas.addEventListener('pointerdown', e => { canvas.focus(); stickOrigin = { x: e.clientX, y: e.clientY }; stick = { dx: 0, dy: 0 }; canvas.setPointerCapture(e.pointerId);
+  const r = $('#game').getBoundingClientRect(); stickEl.style.left = (e.clientX-r.left)+'px'; stickEl.style.top = (e.clientY-r.top)+'px'; stickEl.style.display = 'block'; });
+canvas.addEventListener('pointermove', e => { if (!stickOrigin) return; const dx = (e.clientX-stickOrigin.x)/60, dy = (e.clientY-stickOrigin.y)/60, l = Math.hypot(dx,dy), s = l > 1 ? 1/l : 1; stick = { dx: dx*s, dy: dy*s }; });
+const stickEnd = () => { stickOrigin = null; stick = null; stickEl.style.display = 'none'; };
+canvas.addEventListener('pointerup', stickEnd); canvas.addEventListener('pointercancel', stickEnd);
+$('#tInst').addEventListener('change', e => opt.inst = e.target.checked);
+$('#tClouds').addEventListener('change', e => opt.clouds = e.target.checked);
+$('#tGrass').addEventListener('change', e => opt.bend = e.target.checked);
+$('#btnRestart').addEventListener('click', restart);
+
+/* ---------- 루프 ---------- */
+restart();
+let last = performance.now(), hudTick = 0;
+(function frame(now) {
+  const dt = Math.min(0.05, (now-last)/1000); last = now; T += dt;
+  update(dt); render(); drawMini();
+  if ((hudTick++ & 7) === 0) {
+    $('#hudTime').textContent = game.time.toFixed(1) + ' s';
+    $('#hudTri').textContent = `삼각형 ${fmt(sceneTris)} · 드로우콜 ${fmt(drawCalls)}` + (gpuMs != null ? ` · GPU ${gpuMs.toFixed(1)} ms` : '');
+    $('#stTri').textContent = fmt(sceneTris); $('#stDraw').textContent = fmt(drawCalls);
+    $('#stGpu').textContent = gpuMs != null ? gpuMs.toFixed(2) + ' ms' : '측정 불가'; $('#stCpu').textContent = (cpuMs||0).toFixed(2) + ' ms';
+  }
+  requestAnimationFrame(frame);
+})(last);
+})();
+</script>
