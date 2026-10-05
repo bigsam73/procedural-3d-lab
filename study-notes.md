@@ -199,6 +199,13 @@ flowchart TD
 | 하이브리드 파이프라인 실험실 | `hybrid-patterns.html` | 패턴 네 개를 각각 실험대로 | 지형 베이크 전후의 에이전트 위치 · 인스턴싱 끄기 · 풀 CPU 모드에서 개수 올리기 · 바위 A/B/C/D 모드를 확대해 비교 |
 | 듄 런 | `dune-run.html` | 패턴을 전부 적용한 수집 게임 레벨 | 명세표의 용량 막대 읽기 · 인스턴싱 토글로 드로우콜 비교 · 구름 토글로 하늘 셰이더 비용 비교 · 미니맵이 지형 파일에서 나온 것 확인 |
 
+세 페이지와 이 노트는 GitHub 저장소 [bigsam73/procedural-3d-lab](https://github.com/bigsam73/procedural-3d-lab)에도 있고, GitHub Pages에서 로그인 없이 바로 열린다. 같은 노트의 편집 가능한 원본은 [Claude Docs](https://claude.ai/code/artifact/c59272fe-b661-4897-a0ea-b3309c6e36c0)에 있다.
+
+- [계산하는 3D, 저장하는 3D](https://bigsam73.github.io/procedural-3d-lab/compute-vs-store.html)
+- [하이브리드 파이프라인 실험실](https://bigsam73.github.io/procedural-3d-lab/hybrid-patterns.html)
+- [듄 런](https://bigsam73.github.io/procedural-3d-lab/dune-run.html)
+- [학습 노트 마크다운 판](https://bigsam73.github.io/procedural-3d-lab/study-notes.html)
+
 관찰할 때의 기준은 하나다. **슬라이더를 움직였을 때 어느 숫자가 올라가는가.** 계산 쪽은 픽셀과 스텝에서, 저장 쪽은 정점과 드로우콜과 바이트에서 올라간다.
 
 ## 직접 익히는 연습 순서
