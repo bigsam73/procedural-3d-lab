@@ -231,3 +231,16 @@ flowchart TD
 | CSG | 형태의 합집합·교집합·차집합. SDF에서는 min, max, max(a, -b) 한 줄이다 |
 | Crinkler, kkrunchy | 데모씬이 쓰는 압축 링커·패커. 실행 파일을 4k·64k에 맞춘다 |
 | Nanite | Unreal의 가상 지오메트리. 수억 삼각형을 그대로 넣는 "저장"의 극단 |
+
+<script type="module">
+  // GitHub Pages(Jekyll)에서 mermaid 코드 블록을 그림으로 렌더링한다. GitHub 저장소 화면에서는 GitHub가 직접 렌더링한다.
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  for (const code of document.querySelectorAll('pre > code.language-mermaid')) {
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = code.textContent;
+    code.parentElement.replaceWith(div);
+  }
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+  mermaid.run();
+</script>
